@@ -65,28 +65,34 @@ app.post("/api/insight", async (req, res) => {
       "The user selected this specific angle of analysis: \"" + focusLabel + "\".",
       instruction,
       "",
+      "CRITICAL ACCURACY RULES \u2014 follow these exactly:",
+      "- Use ONLY the numbers, category names, and field names that literally appear in the JSON data below.",
+      "- Never invent a category value, label, or count that is not present in \"categoryBreakdowns\", \"measureStats\", \"top\", \"bottom\", or \"outliers\" below.",
+      "- Every count or number you state must be traceable to a specific value in the JSON. If you're unsure a number is exact, do not state it as exact \u2014 describe the pattern in words instead (e.g. \"a large share of cases\" rather than a made-up figure).",
+      "- \"Row count\" is the total number of rows and is the only valid total to reference unless a measure sum is given.",
+      "- If the data doesn't support a strong claim, say what the data shows is limited/inconclusive rather than filling the gap.",
+      "",
       "Use this format:",
-      "Key Finding: 1-2 sentences, citing specific values, directly addressing the selected angle.",
-      "What's Driving It: 2-3 sentences of explanation relevant to that angle.",
+      "Key Finding: 1-2 sentences, citing specific values that exist in the JSON, directly addressing the selected angle.",
+      "What's Driving It: 2-3 sentences of explanation relevant to that angle, grounded only in the given data.",
       "Recommendations:",
       "1. First concrete, specific action tied to a named category/value from the data.",
       "2. Second concrete action, different angle.",
       "3. Third action if the data supports it, otherwise omit.",
       "",
-      "Be specific and quantitative wherever the data supports it (cite actual category names and numbers). Avoid generic filler. Do not restate every number in the summary \u2014 pick the ones that matter for the selected angle.",
-      "",
       "Category fields: " + (summary.categoryFields || []).join(", "),
-      "Measure fields: " + (summary.measureFields || []).join(", "),
-      "Row count: " + summary.rowCount,
+      "Measure fields: " + (summary.measureFields || []).join(", ") + (summary.measureFields && summary.measureFields.length ? "" : " (none selected \u2014 all figures below are row COUNTS, not sums)"),
+      "Row count (total rows in this view): " + summary.rowCount,
       "Measure stats: " + JSON.stringify(summary.measureStats),
-      "Top performers: " + JSON.stringify(summary.top),
-      "Bottom performers: " + JSON.stringify(summary.bottom),
+      "Top (by primary measure or count): " + JSON.stringify(summary.top),
+      "Bottom (by primary measure or count): " + JSON.stringify(summary.bottom),
       "Trend data: " + summary.trend,
-      "Outliers: " + JSON.stringify(summary.outliers)
+      "Outliers: " + JSON.stringify(summary.outliers),
+      "Exact category value frequency counts (ground truth \u2014 use these for any breakdown claims): " + JSON.stringify(summary.categoryBreakdowns)
     ].join("\n");
 
     const text = await callOpenAI([
-      { role: "system", content: "You are a precise, quantitative BI analyst. Follow the requested format exactly. No preamble, no closing pleasantries." },
+      { role: "system", content: "You are a precise, quantitative BI analyst. You never invent numbers, category names, or values that are not explicitly present in the user's JSON data. Follow the requested format exactly. No preamble, no closing pleasantries." },
       { role: "user", content: prompt }
     ]);
 
