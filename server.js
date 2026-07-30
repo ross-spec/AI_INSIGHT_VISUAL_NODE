@@ -46,21 +46,34 @@ async function callOpenAI(messages) {
 app.post("/api/insight", async (req, res) => {
   try {
     const summary = req.body && req.body.summary;
+    const focus = (req.body && req.body.focus) || "overall";
+    const focusLabel = (req.body && req.body.focusLabel) || "Overall summary";
     if (!summary) return res.status(400).json({ error: "Missing 'summary' in request body" });
+
+    const focusInstructions = {
+      overall: "Give a full structured analysis covering the key finding, what's driving it, the trend, and recommendations.",
+      top_bottom: "Focus specifically on comparing the top and bottom performers. Explain the size of the gap and what it likely means. Recommendations should target closing that gap.",
+      outliers: "Focus specifically on the outliers listed. For each notable outlier, explain why it stands out and what to check or do about it. If there are no outliers, say so plainly and explain what that implies.",
+      trend: "Focus specifically on the trend over time. Describe the direction, whether it's accelerating/stable/reversing, and what action follows from that trajectory.",
+      compare_measures: "Focus specifically on comparing the different measures against each other \u2014 where they agree, where they diverge, and what that combination implies that either measure alone would miss.",
+      recommendation: "Skip background explanation. Go straight to a prioritized action list: the single most important thing to do first, then 2 more ranked by likely impact, each tied to a specific category/value from the data."
+    };
+    const instruction = focusInstructions[focus] || focusInstructions.overall;
 
     const prompt = [
       "You are a senior business intelligence analyst embedded in a Power BI report.",
-      "Analyze the aggregated field summary below and write a structured, specific analysis. Use this exact format:",
+      "The user selected this specific angle of analysis: \"" + focusLabel + "\".",
+      instruction,
       "",
-      "Key Finding: 1-2 sentences on the single most important pattern in the data, citing specific values.",
-      "What's Driving It: 2-3 sentences comparing top vs bottom performers and any outliers, explaining likely causes where inferable from the field names.",
-      "Trend: 1-2 sentences on the trend direction and what it implies going forward.",
+      "Use this format:",
+      "Key Finding: 1-2 sentences, citing specific values, directly addressing the selected angle.",
+      "What's Driving It: 2-3 sentences of explanation relevant to that angle.",
       "Recommendations:",
       "1. First concrete, specific action tied to a named category/value from the data.",
-      "2. Second concrete action, different angle (e.g. process, resourcing, or follow-up on outliers).",
+      "2. Second concrete action, different angle.",
       "3. Third action if the data supports it, otherwise omit.",
       "",
-      "Be specific and quantitative wherever the data supports it (cite actual category names and numbers). Avoid generic filler like 'monitor performance' without tying it to what's in the data. Do not restate every number in the summary — pick the ones that matter.",
+      "Be specific and quantitative wherever the data supports it (cite actual category names and numbers). Avoid generic filler. Do not restate every number in the summary \u2014 pick the ones that matter for the selected angle.",
       "",
       "Category fields: " + (summary.categoryFields || []).join(", "),
       "Measure fields: " + (summary.measureFields || []).join(", "),
