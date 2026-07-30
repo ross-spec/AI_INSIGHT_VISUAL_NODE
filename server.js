@@ -31,7 +31,7 @@ async function callOpenAI(messages) {
       model: MODEL,
       messages,
       temperature: 0.4,
-      max_tokens: 900
+      max_tokens: 1300
     })
   });
   if (!resp.ok) {
@@ -51,7 +51,7 @@ app.post("/api/insight", async (req, res) => {
     if (!summary) return res.status(400).json({ error: "Missing 'summary' in request body" });
 
     const focusInstructions = {
-      overall: "Give a full structured analysis covering the key finding, what's driving it, the trend, and recommendations.",
+      overall: "Give a thorough, multi-angle analysis. Don't stop at the single biggest bucket in one field \u2014 walk through the breakdown of EVERY category field provided in categoryBreakdowns (not just the first), point out where distributions are skewed vs. even, and note any fields whose splits seem related to each other (e.g. one field's dominant value co-occurring with a pattern in another). Use exact counts from categoryBreakdowns throughout.",
       top_bottom: "Focus specifically on comparing the top and bottom performers. Explain the size of the gap and what it likely means. Recommendations should target closing that gap.",
       outliers: "Focus specifically on the outliers listed. For each notable outlier, explain why it stands out and what to check or do about it. If there are no outliers, say so plainly and explain what that implies.",
       trend: "Focus specifically on the trend over time. Describe the direction, whether it's accelerating/stable/reversing, and what action follows from that trajectory.",
@@ -59,6 +59,7 @@ app.post("/api/insight", async (req, res) => {
       recommendation: "Skip background explanation. Go straight to a prioritized action list: the single most important thing to do first, then 2 more ranked by likely impact, each tied to a specific category/value from the data."
     };
     const instruction = focusInstructions[focus] || focusInstructions.overall;
+    const isDeepDive = focus === "overall";
 
     const prompt = [
       "You are a senior business intelligence analyst embedded in a Power BI report.",
@@ -74,7 +75,9 @@ app.post("/api/insight", async (req, res) => {
       "",
       "Use this format:",
       "Key Finding: 1-2 sentences, citing specific values that exist in the JSON, directly addressing the selected angle.",
-      "What's Driving It: 2-3 sentences of explanation relevant to that angle, grounded only in the given data.",
+      "What's Driving It: " + (isDeepDive
+        ? "A paragraph per notable category field in categoryBreakdowns (cover at least 3 fields if that many are provided), each citing the field's actual top values and counts, plus any cross-field pattern you can support with the given data."
+        : "2-3 sentences of explanation relevant to that angle, grounded only in the given data."),
       "Recommendations:",
       "1. First concrete, specific action tied to a named category/value from the data.",
       "2. Second concrete action, different angle.",
@@ -88,7 +91,7 @@ app.post("/api/insight", async (req, res) => {
       "Bottom (by primary measure or count): " + JSON.stringify(summary.bottom),
       "Trend data: " + summary.trend,
       "Outliers: " + JSON.stringify(summary.outliers),
-      "Exact category value frequency counts (ground truth \u2014 use these for any breakdown claims): " + JSON.stringify(summary.categoryBreakdowns)
+      "Exact category value frequency counts for EVERY category field (ground truth \u2014 use these for any breakdown claims, and for 'overall' cover multiple fields, not just the first): " + JSON.stringify(summary.categoryBreakdowns)
     ].join("\n");
 
     const text = await callOpenAI([
