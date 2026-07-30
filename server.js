@@ -31,7 +31,7 @@ async function callOpenAI(messages) {
       model: MODEL,
       messages,
       temperature: 0.4,
-      max_tokens: 500
+      max_tokens: 900
     })
   });
   if (!resp.ok) {
@@ -49,9 +49,18 @@ app.post("/api/insight", async (req, res) => {
     if (!summary) return res.status(400).json({ error: "Missing 'summary' in request body" });
 
     const prompt = [
-      "You are a business intelligence analyst embedded in a Power BI report.",
-      "Given the following aggregated field summary, write a concise insight (2-4 sentences) describing what stands out,",
-      "followed by one short, actionable recommendation. Do not restate raw numbers verbatim beyond what's needed; be specific and business-relevant.",
+      "You are a senior business intelligence analyst embedded in a Power BI report.",
+      "Analyze the aggregated field summary below and write a structured, specific analysis. Use this exact format:",
+      "",
+      "Key Finding: 1-2 sentences on the single most important pattern in the data, citing specific values.",
+      "What's Driving It: 2-3 sentences comparing top vs bottom performers and any outliers, explaining likely causes where inferable from the field names.",
+      "Trend: 1-2 sentences on the trend direction and what it implies going forward.",
+      "Recommendations:",
+      "1. First concrete, specific action tied to a named category/value from the data.",
+      "2. Second concrete action, different angle (e.g. process, resourcing, or follow-up on outliers).",
+      "3. Third action if the data supports it, otherwise omit.",
+      "",
+      "Be specific and quantitative wherever the data supports it (cite actual category names and numbers). Avoid generic filler like 'monitor performance' without tying it to what's in the data. Do not restate every number in the summary — pick the ones that matter.",
       "",
       "Category fields: " + (summary.categoryFields || []).join(", "),
       "Measure fields: " + (summary.measureFields || []).join(", "),
@@ -59,12 +68,12 @@ app.post("/api/insight", async (req, res) => {
       "Measure stats: " + JSON.stringify(summary.measureStats),
       "Top performers: " + JSON.stringify(summary.top),
       "Bottom performers: " + JSON.stringify(summary.bottom),
-      "Trend: " + summary.trend,
+      "Trend data: " + summary.trend,
       "Outliers: " + JSON.stringify(summary.outliers)
     ].join("\n");
 
     const text = await callOpenAI([
-      { role: "system", content: "You write short, precise BI insights and one recommendation. No preamble." },
+      { role: "system", content: "You are a precise, quantitative BI analyst. Follow the requested format exactly. No preamble, no closing pleasantries." },
       { role: "user", content: prompt }
     ]);
 
