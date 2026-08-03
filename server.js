@@ -36,7 +36,10 @@ async function callGemini(messages) {
     contents: conversationParts,
     generationConfig: {
       temperature: 0.4,
-      maxOutputTokens: 1300
+      maxOutputTokens: 3000,
+      thinkingConfig: {
+        thinkingLevel: "low"
+      }
     }
   };
   if (systemParts) {
@@ -56,7 +59,11 @@ async function callGemini(messages) {
   const data = await resp.json();
   const candidate = data.candidates && data.candidates[0];
   const parts = candidate && candidate.content && candidate.content.parts;
-  return parts && parts.map(p => p.text || "").join("");
+  let text = parts && parts.map(p => p.text || "").join("");
+  if (candidate && candidate.finishReason === "MAX_TOKENS" && text) {
+    text += "\n\n[Response was cut off by the token limit \u2014 consider raising maxOutputTokens further.]";
+  }
+  return text;
 }
 
 // Used by the InsightLens Power BI custom visual — receives a compact stats summary, not raw rows.
