@@ -14,8 +14,8 @@ app.use(cors({
 }));
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-// Gemini's free-tier workhorse model: ~1,500 requests/day, 15 requests/minute, no card required.
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+// Gemini's current stable free-tier model (Google retired gemini-2.5-flash for new keys in 2026).
+const MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 
 if (!GEMINI_API_KEY) {
   console.warn("WARNING: GEMINI_API_KEY is not set. Requests will fail until it is configured.");
