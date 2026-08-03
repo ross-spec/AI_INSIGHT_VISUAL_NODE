@@ -1,4 +1,4 @@
-// Insight Proxy — holds the OpenAI key server-side.
+// Insight Proxy — holds the Gemini key server-side (free tier).
 // Used by DataIQ (chat-style analysis) and the InsightLens Power BI custom visual (/api/insight).
 const express = require("express");
 const cors = require("cors");
@@ -13,33 +13,50 @@ app.use(cors({
   origin: allowedOrigins.includes("*") ? true : allowedOrigins
 }));
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+// Gemini's free-tier workhorse model: ~1,500 requests/day, 15 requests/minute, no card required.
+const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
-if (!OPENAI_API_KEY) {
-  console.warn("WARNING: OPENAI_API_KEY is not set. Requests will fail until it is configured.");
+if (!GEMINI_API_KEY) {
+  console.warn("WARNING: GEMINI_API_KEY is not set. Requests will fail until it is configured.");
 }
 
-async function callOpenAI(messages) {
-  const resp = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer " + OPENAI_API_KEY
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      messages,
+// Accepts the same { role, content } message shape used before (system/user), and calls
+// Gemini's generateContent endpoint instead of OpenAI's chat/completions.
+async function callGemini(messages) {
+  const systemParts = messages.filter(m => m.role === "system").map(m => m.content).join("\n\n");
+  const conversationParts = messages
+    .filter(m => m.role !== "system")
+    .map(m => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }]
+    }));
+
+  const body = {
+    contents: conversationParts,
+    generationConfig: {
       temperature: 0.4,
-      max_tokens: 1300
-    })
+      maxOutputTokens: 1300
+    }
+  };
+  if (systemParts) {
+    body.systemInstruction = { parts: [{ text: systemParts }] };
+  }
+
+  const url = "https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent?key=" + GEMINI_API_KEY;
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
   });
   if (!resp.ok) {
     const errText = await resp.text();
-    throw new Error("OpenAI error " + resp.status + ": " + errText);
+    throw new Error("Gemini error " + resp.status + ": " + errText);
   }
   const data = await resp.json();
-  return data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+  const candidate = data.candidates && data.candidates[0];
+  const parts = candidate && candidate.content && candidate.content.parts;
+  return parts && parts.map(p => p.text || "").join("");
 }
 
 // Used by the InsightLens Power BI custom visual — receives a compact stats summary, not raw rows.
@@ -94,7 +111,7 @@ app.post("/api/insight", async (req, res) => {
       "Exact category value frequency counts for EVERY category field (ground truth \u2014 use these for any breakdown claims, and for 'overall' cover multiple fields, not just the first): " + JSON.stringify(summary.categoryBreakdowns)
     ].join("\n");
 
-    const text = await callOpenAI([
+    const text = await callGemini([
       { role: "system", content: "You are a precise, quantitative BI analyst. You never invent numbers, category names, or values that are not explicitly present in the user's JSON data. Follow the requested format exactly. No preamble, no closing pleasantries." },
       { role: "user", content: prompt }
     ]);
@@ -111,7 +128,7 @@ app.post("/api/chat", async (req, res) => {
   try {
     const messages = req.body && req.body.messages;
     if (!messages) return res.status(400).json({ error: "Missing 'messages' in request body" });
-    const text = await callOpenAI(messages);
+    const text = await callGemini(messages);
     res.json({ text });
   } catch (err) {
     console.error(err);
