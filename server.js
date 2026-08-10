@@ -84,11 +84,23 @@ app.post("/api/insight", async (req, res) => {
     };
     const instruction = focusInstructions[focus] || focusInstructions.overall;
     const isDeepDive = focus === "overall";
+    const focusedKpi = summary.focusedMeasure || null;
+
+    const kpiInstruction = focusedKpi
+      ? [
+          "",
+          "IMPORTANT \u2014 THE USER HAS SELECTED A SINGLE KPI TO FOCUS ON: \"" + focusedKpi + "\".",
+          "Every part of your response \u2014 Key Finding, What's Driving It, and every recommendation \u2014 must be about \"" + focusedKpi + "\" specifically.",
+          "Do NOT analyze, mention, or make recommendations about any other measure in this dataset, even if it appears in the data below. \"top\", \"bottom\", \"outliers\", and \"trend\" below have already been computed against \"" + focusedKpi + "\" only \u2014 treat them as that.",
+          "If a category breakdown seems relevant to explaining \"" + focusedKpi + "\", you may reference it, but always tie it back to \"" + focusedKpi + "\" explicitly rather than discussing it in isolation."
+        ].join("\n")
+      : "";
 
     const prompt = [
       "You are a senior business intelligence analyst embedded in a Power BI report.",
       "The user selected this specific angle of analysis: \"" + focusLabel + "\".",
       instruction,
+      kpiInstruction,
       "",
       "CRITICAL ACCURACY RULES \u2014 follow these exactly:",
       "- Use ONLY the numbers, category names, and field names that literally appear in the JSON data below.",
@@ -98,21 +110,22 @@ app.post("/api/insight", async (req, res) => {
       "- If the data doesn't support a strong claim, say what the data shows is limited/inconclusive rather than filling the gap.",
       "",
       "Use this format:",
-      "Key Finding: 1-2 sentences, citing specific values that exist in the JSON, directly addressing the selected angle.",
+      "Key Finding: 1-2 sentences, citing specific values that exist in the JSON, directly addressing the selected angle" + (focusedKpi ? " and specifically \"" + focusedKpi + "\"" : "") + ".",
       "What's Driving It: " + (isDeepDive
         ? "A paragraph per notable category field in categoryBreakdowns (cover at least 3 fields if that many are provided), each citing the field's actual top values and counts, plus any cross-field pattern you can support with the given data."
         : "2-3 sentences of explanation relevant to that angle, grounded only in the given data."),
       "Recommendations:",
-      "1. First concrete, specific action tied to a named category/value from the data.",
-      "2. Second concrete action, different angle.",
+      "1. First concrete, specific action tied to a named category/value from the data" + (focusedKpi ? ", aimed at improving \"" + focusedKpi + "\"" : "") + ".",
+      "2. Second concrete action, different angle" + (focusedKpi ? ", still about \"" + focusedKpi + "\"" : "") + ".",
       "3. Third action if the data supports it, otherwise omit.",
       "",
       "Category fields: " + (summary.categoryFields || []).join(", "),
       "Measure fields: " + (summary.measureFields || []).join(", ") + (summary.measureFields && summary.measureFields.length ? "" : " (none selected \u2014 all figures below are row COUNTS, not sums)"),
+      "Focused KPI (analyze ONLY this if set): " + (focusedKpi || "none \u2014 analyze all measures/fields"),
       "Row count (total rows in this view): " + summary.rowCount,
       "Measure stats: " + JSON.stringify(summary.measureStats),
-      "Top (by primary measure or count): " + JSON.stringify(summary.top),
-      "Bottom (by primary measure or count): " + JSON.stringify(summary.bottom),
+      "Top (by " + (focusedKpi || "primary measure or count") + "): " + JSON.stringify(summary.top),
+      "Bottom (by " + (focusedKpi || "primary measure or count") + "): " + JSON.stringify(summary.bottom),
       "Trend data: " + summary.trend,
       "Outliers: " + JSON.stringify(summary.outliers),
       "Exact category value frequency counts for EVERY category field (ground truth \u2014 use these for any breakdown claims, and for 'overall' cover multiple fields, not just the first): " + JSON.stringify(summary.categoryBreakdowns)
