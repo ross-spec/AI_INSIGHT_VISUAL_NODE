@@ -85,6 +85,7 @@ app.post("/api/insight", async (req, res) => {
     const instruction = focusInstructions[focus] || focusInstructions.overall;
     const isDeepDive = focus === "overall";
     const focusedKpi = summary.focusedMeasure || null;
+    const focusedColumn = summary.focusedColumn || null;
 
     const kpiInstruction = focusedKpi
       ? [
@@ -96,11 +97,23 @@ app.post("/api/insight", async (req, res) => {
         ].join("\n")
       : "";
 
+    const columnInstruction = focusedColumn
+      ? [
+          "",
+          "IMPORTANT \u2014 THE USER HAS ALSO SELECTED A SPECIFIC COLUMN TO GROUP BY: \"" + focusedColumn + "\".",
+          focusedKpi
+            ? "\"top\" and \"bottom\" below are already aggregated \"" + focusedKpi + "\" values GROUPED BY \"" + focusedColumn + "\" (e.g. the sum or average of the KPI for each distinct value of \"" + focusedColumn + "\") \u2014 their \"label\" field is a value of \"" + focusedColumn + "\", not an individual row."
+            : "\"top\" and \"bottom\" below are counts grouped by \"" + focusedColumn + "\"'s distinct values.",
+          "Frame every finding and recommendation in terms of \"" + focusedColumn + "\" values specifically (e.g. name the actual category values from top/bottom), not other fields."
+        ].join("\n")
+      : "";
+
     const prompt = [
       "You are a senior business intelligence analyst embedded in a Power BI report.",
       "The user selected this specific angle of analysis: \"" + focusLabel + "\".",
       instruction,
       kpiInstruction,
+      columnInstruction,
       "",
       "CRITICAL ACCURACY RULES \u2014 follow these exactly:",
       "- Use ONLY the numbers, category names, and field names that literally appear in the JSON data below.",
@@ -123,6 +136,7 @@ app.post("/api/insight", async (req, res) => {
       "Category fields: " + (summary.categoryFields || []).join(", "),
       "Measure fields: " + (summary.measureFields || []).join(", ") + (summary.measureFields && summary.measureFields.length ? "" : " (none selected \u2014 all figures below are row COUNTS, not sums)"),
       "Focused KPI (analyze ONLY this if set): " + (focusedKpi || "none \u2014 analyze all measures/fields"),
+      "Focused Column (top/bottom below are grouped by this if set): " + (focusedColumn || "none \u2014 not grouped by a specific column"),
       "Row count (total rows in this view): " + summary.rowCount,
       "Measure stats: " + JSON.stringify(summary.measureStats),
       "Top (by " + (focusedKpi || "primary measure or count") + "): " + JSON.stringify(summary.top),
