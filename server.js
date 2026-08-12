@@ -107,6 +107,7 @@ app.post("/api/insight", async (req, res) => {
       "- Never invent a category value, label, or count that is not present in \"categoryBreakdowns\", \"measureStats\", \"top\", \"bottom\", or \"outliers\" below.",
       "- Every count or number you state must be traceable to a specific value in the JSON. If you're unsure a number is exact, do not state it as exact \u2014 describe the pattern in words instead (e.g. \"a large share of cases\" rather than a made-up figure).",
       "- \"Row count\" is the total number of rows and is the only valid total to reference unless a measure sum is given.",
+      "- In \"measureStats\", any entry with \"isPercent\": true is a percentage/ratio measure (e.g. a loss ratio, a rate, a %). NEVER cite or imply the \"sum\" of a percent-type measure \u2014 summing percentages across rows is not a meaningful number. For those measures, only ever reference \"avg\", \"min\", or \"max\".",
       "- If the data doesn't support a strong claim, say what the data shows is limited/inconclusive rather than filling the gap.",
       "",
       "Use this format:",
